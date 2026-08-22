@@ -1,0 +1,12 @@
+Checks: >
+  -*,
+  bugprone-*,
+  performance-*,
+  portability-*,
+  modernize-*,
+  -modernize-use-trailing-return-type,
+  -bugprone-easily-swappable-parameters,
+  -bugprone-exception-escape,
+  -portability-avoid-pragma-once
+HeaderFilterRegex: '.*/MicroTelemetryFramework/(include|tests|examples)/.*'
+WarningsAsErrors: ''

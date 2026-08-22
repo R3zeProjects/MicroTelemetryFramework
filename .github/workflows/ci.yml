@@ -1,0 +1,189 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  MCF_REF: b9f78d3f529097ac1dae963b06274a6110b39c1a
+
+jobs:
+  build-test:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux GCC
+            os: ubuntu-24.04
+            cmake_args: -DCMAKE_CXX_COMPILER=g++
+            cxxflags: ''
+          - name: Linux Clang
+            os: ubuntu-24.04
+            cmake_args: -DCMAKE_CXX_COMPILER=clang++
+            cxxflags: -stdlib=libc++ -fexperimental-library
+          - name: Windows MSVC
+            os: windows-2022
+            cmake_args: ''
+            cxxflags: ''
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          path: mtf
+      - uses: actions/checkout@v5
+        with:
+          repository: R3zeProjects/MicroContractsFramework
+          ref: ${{ env.MCF_REF }}
+          path: contracts
+      - name: Install Clang standard library
+        if: matrix.name == 'Linux Clang'
+        run: >-
+          bash mtf/.github/scripts/install-apt-packages.sh
+          clang libc++-dev libc++abi-dev ninja-build
+      - name: Configure
+        shell: bash
+        env:
+          CXXFLAGS: ${{ matrix.cxxflags }}
+          LDFLAGS: ${{ matrix.cxxflags }}
+        run: >-
+          cmake -S mtf -B build -DCMAKE_BUILD_TYPE=Release
+          -DMTF_CONTRACTS_SOURCE_DIR="${{ github.workspace }}/contracts"
+          -DMTF_BUILD_EXAMPLES=ON
+          -DMTF_BUILD_BENCHMARKS=ON
+          ${{ matrix.cmake_args }}
+      - name: Build
+        run: cmake --build build --config Release --parallel 2
+      - name: Test
+        run: ctest --test-dir build -C Release --output-on-failure
+
+  sanitizers:
+    name: Linux ASan and UBSan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          path: mtf
+      - uses: actions/checkout@v5
+        with:
+          repository: R3zeProjects/MicroContractsFramework
+          ref: ${{ env.MCF_REF }}
+          path: contracts
+      - name: Install tools
+        run: bash mtf/.github/scripts/install-apt-packages.sh clang ninja-build
+      - name: Configure
+        run: >-
+          cmake -S mtf -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo
+          -DCMAKE_CXX_COMPILER=clang++
+          -DMTF_CONTRACTS_SOURCE_DIR="${{ github.workspace }}/contracts"
+          -DMTF_BUILD_EXAMPLES=OFF
+          -DMTF_ENABLE_SANITIZERS=ON
+      - name: Build and test
+        run: |
+          cmake --build build --parallel 2
+          ctest --test-dir build --output-on-failure
+
+  thread-sanitizer:
+    name: Linux ThreadSanitizer
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      CXXFLAGS: -stdlib=libc++ -fexperimental-library
+      LDFLAGS: -stdlib=libc++ -fexperimental-library
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          path: mtf
+      - uses: actions/checkout@v5
+        with:
+          repository: R3zeProjects/MicroContractsFramework
+          ref: ${{ env.MCF_REF }}
+          path: contracts
+      - name: Install tools
+        run: >-
+          bash mtf/.github/scripts/install-apt-packages.sh
+          clang ninja-build libc++-dev libc++abi-dev
+      - name: Configure
+        run: >-
+          cmake -S mtf -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
+          -DCMAKE_CXX_COMPILER=clang++
+          -DMTF_CONTRACTS_SOURCE_DIR="${{ github.workspace }}/contracts"
+          -DMTF_BUILD_EXAMPLES=OFF
+          -DMTF_ENABLE_THREAD_SANITIZER=ON
+      - name: Build and test
+        run: |
+          cmake --build build --parallel 2
+          ctest --test-dir build --output-on-failure
+
+  static-analysis:
+    name: Linux clang-tidy
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      CXXFLAGS: -stdlib=libc++ -fexperimental-library
+      LDFLAGS: -stdlib=libc++ -fexperimental-library
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          path: mtf
+      - uses: actions/checkout@v5
+        with:
+          repository: R3zeProjects/MicroContractsFramework
+          ref: ${{ env.MCF_REF }}
+          path: contracts
+      - name: Install tools
+        run: >-
+          bash mtf/.github/scripts/install-apt-packages.sh
+          clang clang-tidy ninja-build libc++-dev libc++abi-dev
+      - name: Configure and analyze
+        run: >-
+          cmake -S mtf -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
+          -DCMAKE_CXX_COMPILER=clang++
+          -DCMAKE_CXX_CLANG_TIDY=clang-tidy
+          -DMTF_CONTRACTS_SOURCE_DIR="${{ github.workspace }}/contracts"
+          -DMTF_BUILD_EXAMPLES=ON
+      - name: Build
+        run: cmake --build build --parallel 2
+
+  installed-package:
+    name: Installed package consumer
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          path: mtf
+      - uses: actions/checkout@v5
+        with:
+          repository: R3zeProjects/MicroContractsFramework
+          ref: ${{ env.MCF_REF }}
+          path: contracts
+      - name: Install tools
+        run: bash mtf/.github/scripts/install-apt-packages.sh ninja-build
+      - name: Install MCF and MTF
+        run: |
+          cmake -S contracts -B contracts-build -G Ninja -DBUILD_TESTING=OFF
+          cmake --install contracts-build --prefix "$PWD/stage"
+          cmake -S mtf -B mtf-build -G Ninja -DBUILD_TESTING=OFF \
+            -DMTF_BUILD_EXAMPLES=OFF -DMTF_FETCH_CONTRACTS=OFF \
+            -DCMAKE_PREFIX_PATH="$PWD/stage"
+          cmake --install mtf-build --prefix "$PWD/stage"
+          grep -F 'set(PACKAGE_VERSION "0.1.0")' \
+            stage/lib/cmake/mtf/mtfConfigVersion.cmake
+      - name: Build and run consumer
+        run: |
+          cmake -S mtf/tests/package_consumer -B consumer -G Ninja \
+            -DCMAKE_PREFIX_PATH="$PWD/stage"
+          cmake --build consumer --parallel 2
+          ./consumer/mtf_package_consumer
