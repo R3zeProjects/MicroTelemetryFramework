@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.25)
 
-project(MicroTelemetryFramework VERSION 0.1.0 LANGUAGES CXX)
+project(MicroTelemetryFramework VERSION 0.1.1 LANGUAGES CXX)
 
 set(MICRO_TELEMETRY_FRAMEWORK_PRERELEASE "beta")
 
@@ -11,6 +11,10 @@ find_package(Threads REQUIRED)
 
 option(MTF_BUILD_EXAMPLES "Build MTF examples" ON)
 option(MTF_BUILD_BENCHMARKS "Build opt-in MTF benchmarks" OFF)
+option(MTF_BUILD_EXTERNAL_COMPARISON_BENCHMARKS
+    "Build pinned prometheus-cpp and OpenTelemetry comparisons" OFF)
+option(MTF_BUILD_ECOSYSTEM_BENCHMARKS
+    "Build the pinned MCF+MEF+MPF+MTF end-to-end benchmark" OFF)
 option(MTF_ENABLE_SANITIZERS "Enable AddressSanitizer and UndefinedBehaviorSanitizer" OFF)
 option(MTF_ENABLE_THREAD_SANITIZER "Enable ThreadSanitizer" OFF)
 option(MTF_FETCH_CONTRACTS "Fetch pinned MCF contracts when not installed" ON)
@@ -109,6 +113,89 @@ endif()
 if(MTF_BUILD_BENCHMARKS)
     add_executable(MicroTelemetryFrameworkBenchmark benchmarks/mtf_benchmark.cpp)
     target_link_libraries(MicroTelemetryFrameworkBenchmark PRIVATE MicroTelemetryFramework)
+endif()
+
+if(MTF_BUILD_EXTERNAL_COMPARISON_BENCHMARKS)
+    include(FetchContent)
+    # OpenTelemetry 1.9.1 still declares an old policy baseline. New CMake
+    # versions require consumers to opt into the compatible policy floor.
+    set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
+
+    set(ENABLE_PULL OFF CACHE BOOL "" FORCE)
+    set(ENABLE_PUSH OFF CACHE BOOL "" FORCE)
+    set(ENABLE_COMPRESSION OFF CACHE BOOL "" FORCE)
+    set(ENABLE_TESTING OFF CACHE BOOL "" FORCE)
+    set(OVERRIDE_CXX_STANDARD_FLAGS OFF CACHE BOOL "" FORCE)
+    set(GENERATE_PKGCONFIG OFF CACHE BOOL "" FORCE)
+    FetchContent_Declare(mtf_prometheus_cpp
+        GIT_REPOSITORY https://github.com/jupp0r/prometheus-cpp.git
+        GIT_TAG e5fada43131d251e9c4786b04263ce98b6767ba5
+        GIT_SHALLOW FALSE)
+    FetchContent_MakeAvailable(mtf_prometheus_cpp)
+
+    set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
+    set(WITH_EXAMPLES OFF CACHE BOOL "" FORCE)
+    set(WITH_OTLP OFF CACHE BOOL "" FORCE)
+    set(WITH_OTLP_GRPC OFF CACHE BOOL "" FORCE)
+    set(WITH_OTLP_HTTP OFF CACHE BOOL "" FORCE)
+    set(WITH_ZIPKIN OFF CACHE BOOL "" FORCE)
+    set(WITH_PROMETHEUS OFF CACHE BOOL "" FORCE)
+    set(WITH_BENCHMARK OFF CACHE BOOL "" FORCE)
+    set(OPENTELEMETRY_INSTALL OFF CACHE BOOL "" FORCE)
+    FetchContent_Declare(mtf_opentelemetry_cpp
+        GIT_REPOSITORY https://github.com/open-telemetry/opentelemetry-cpp.git
+        GIT_TAG 770fce3c4095f6dc852fd80fb0810936b723be9a
+        GIT_SHALLOW FALSE)
+    FetchContent_MakeAvailable(mtf_opentelemetry_cpp)
+
+    add_executable(MicroTelemetryFrameworkExternalBenchmark
+        benchmarks/mtf_external_comparison.cpp)
+    target_link_libraries(MicroTelemetryFrameworkExternalBenchmark PRIVATE
+        MicroTelemetryFramework prometheus-cpp::core opentelemetry_metrics)
+endif()
+
+if(MTF_BUILD_ECOSYSTEM_BENCHMARKS)
+    include(FetchContent)
+    if(POLICY CMP0169)
+        cmake_policy(PUSH)
+        cmake_policy(SET CMP0169 OLD)
+    endif()
+    FetchContent_Declare(mtf_mef
+        GIT_REPOSITORY https://github.com/R3zeProjects/MicroErrorFramework.git
+        GIT_TAG c11c3aa25814baa1a889ab1f80b718e59e3a24a9
+        GIT_SHALLOW FALSE)
+    FetchContent_Declare(mtf_mpf
+        GIT_REPOSITORY https://github.com/R3zeProjects/MicroPersistenceFramework.git
+        GIT_TAG 00aec475b283812c232758c539e70ce8fae09f64
+        GIT_SHALLOW FALSE)
+    FetchContent_GetProperties(mtf_mef)
+    if(NOT mtf_mef_POPULATED)
+        FetchContent_Populate(mtf_mef)
+    endif()
+    FetchContent_GetProperties(mtf_mpf)
+    if(NOT mtf_mpf_POPULATED)
+        FetchContent_Populate(mtf_mpf)
+    endif()
+    if(POLICY CMP0169)
+        cmake_policy(POP)
+    endif()
+
+    set(MEF_CONTRACTS_SOURCE_DIR "${MTF_CONTRACTS_SOURCE_DIR}" CACHE PATH "" FORCE)
+    set(MPF_MEF_SOURCE_DIR "${mtf_mef_SOURCE_DIR}" CACHE PATH "" FORCE)
+    set(MPF_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+    set(MPF_BUILD_BENCHMARKS OFF CACHE BOOL "" FORCE)
+    set(MPF_BUILD_EXTERNAL_COMPARISON_BENCHMARKS OFF CACHE BOOL "" FORCE)
+    set(_mtf_saved_build_testing "${BUILD_TESTING}")
+    set(BUILD_TESTING OFF)
+    add_subdirectory("${mtf_mpf_SOURCE_DIR}"
+                     "${CMAKE_CURRENT_BINARY_DIR}/ecosystem/mpf" EXCLUDE_FROM_ALL)
+    set(BUILD_TESTING "${_mtf_saved_build_testing}")
+    unset(_mtf_saved_build_testing)
+
+    add_executable(MicroTelemetryFrameworkEcosystemBenchmark
+        benchmarks/mtf_ecosystem_benchmark.cpp)
+    target_link_libraries(MicroTelemetryFrameworkEcosystemBenchmark PRIVATE
+        MicroTelemetryFramework vosp::vosp vosp::persistence)
 endif()
 
 install(TARGETS MicroTelemetryFramework EXPORT mtfTargets)

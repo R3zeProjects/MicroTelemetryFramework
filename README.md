@@ -7,7 +7,7 @@ code to a specific observability backend.
 > Build one telemetry contour around any subsystem, then replace its exporter
 > without rewriting instrumentation.
 
-The current release is **0.1.0-beta**. MTF is header-only and supports GCC,
+The current release is **0.1.1-beta**. MTF is header-only and supports GCC,
 Clang, and MSVC through CMake 3.25 or newer.
 
 ## Capabilities
@@ -105,10 +105,54 @@ cmake --build build-release --parallel
 ./build-release/MicroTelemetryFrameworkBenchmark
 ```
 
+## External comparison
+
+Pinned Release comparison on AMD Ryzen 7 PRO 1700X with Clang 22.1.6 on
+Windows, median of seven runs with 1,000,000 updates per run:
+
+| Library | Counter updates/s | Histogram observations/s |
+| --- | ---: | ---: |
+| `std::atomic<double>` baseline | **123.805M** | — |
+| MTF 0.1.1 | **123.790M** | **55.745M** |
+| prometheus-cpp 1.3.0 | **129.835M** | **26.378M** |
+| OpenTelemetry C++ SDK 1.9.1 | **34.583M** | **27.366M** |
+
+MTF counter is within measurement noise of the atomic baseline and 4.7% below
+prometheus-cpp in this run. Its fixed-boundary histogram measured 2.11x the
+prometheus-cpp rate and 2.04x the OpenTelemetry SDK rate.
+
+This is a hot-path comparison, not a claim that MTF replaces OpenTelemetry.
+OpenTelemetry also provides standardized semantic conventions, context
+propagation, processors, and wire exporters that MTF 0.1.1 does not implement.
+All implementations aggregate one unlabelled counter or histogram; collection
+validation occurs outside the timed region. MTF and prometheus-cpp use the same
+four explicit bucket boundaries, while OpenTelemetry uses its SDK-default
+histogram aggregation, so the histogram row compares practical hot paths rather
+than identical internal data structures.
+
+## Complete ecosystem contour
+
+The pinned MCF + MEF + MPF + MTF workload performs, per transaction:
+
+1. one MEF structured error log;
+2. one MTF counter update and one owning event;
+3. persistence of the log and event as two MPF records;
+4. validation of every accepted and persisted record.
+
+| Mode | Median transactions/s | Persisted records/s |
+| --- | ---: | ---: |
+| Direct telemetry export | **5.685M** | **11.369M** |
+| Bounded async q1024/b64 | **1.609M** | **3.218M** |
+
+The direct mode is faster because the in-memory journal is cheap; asynchronous
+mode pays queueing and ownership costs without hiding slow I/O. Async remains
+valuable when the real exporter blocks or has bursty latency.
+
 ## Documentation
 
 - [Architecture](docs/ARCHITECTURE.md)
 - [API and concurrency contracts](docs/API_CONTRACTS.md)
 - [Benchmark methodology](docs/BENCHMARKS.md)
+- [Ecosystem capability and maturity assessment](docs/ECOSYSTEM.md)
 
 MTF is licensed under the MIT License.

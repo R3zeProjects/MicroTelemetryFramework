@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.1-beta - 2026-08-22
+
+- Added pinned counter and histogram comparisons with prometheus-cpp 1.3.0
+  and OpenTelemetry C++ 1.9.1.
+- Added a validated MCF + MEF + MPF + MTF end-to-end benchmark.
+- Documented benchmark equivalence limits and ecosystem maturity.
+
 ## 0.1.0-beta - 2026-08-22
 
 - Added owning metrics, events, spans, and attributes.

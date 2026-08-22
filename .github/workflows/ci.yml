@@ -17,6 +17,59 @@ env:
   MCF_REF: b9f78d3f529097ac1dae963b06274a6110b39c1a
 
 jobs:
+  external-comparisons:
+    name: Pinned telemetry comparisons
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          path: mtf
+      - uses: actions/checkout@v5
+        with:
+          repository: R3zeProjects/MicroContractsFramework
+          ref: ${{ env.MCF_REF }}
+          path: contracts
+      - name: Configure pinned libraries
+        run: >-
+          cmake -S mtf -B build -DCMAKE_BUILD_TYPE=Release
+          -DMTF_CONTRACTS_SOURCE_DIR="${{ github.workspace }}/contracts"
+          -DBUILD_TESTING=OFF
+          -DMTF_BUILD_EXAMPLES=OFF
+          -DMTF_BUILD_EXTERNAL_COMPARISON_BENCHMARKS=ON
+      - name: Build comparison
+        run: >-
+          cmake --build build --parallel 2
+          --target MicroTelemetryFrameworkExternalBenchmark
+      - name: Validate comparable workloads
+        run: ./build/MicroTelemetryFrameworkExternalBenchmark 100000
+
+  ecosystem-contour:
+    name: MCF + MEF + MPF + MTF contour
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          path: mtf
+      - uses: actions/checkout@v5
+        with:
+          repository: R3zeProjects/MicroContractsFramework
+          ref: ${{ env.MCF_REF }}
+          path: contracts
+      - name: Configure pinned ecosystem
+        run: >-
+          cmake -S mtf -B build -DCMAKE_BUILD_TYPE=Release
+          -DMTF_CONTRACTS_SOURCE_DIR="${{ github.workspace }}/contracts"
+          -DBUILD_TESTING=OFF
+          -DMTF_BUILD_EXAMPLES=OFF
+          -DMTF_BUILD_ECOSYSTEM_BENCHMARKS=ON
+      - name: Build and validate full contour
+        run: |
+          cmake --build build --parallel 2 \
+            --target MicroTelemetryFrameworkEcosystemBenchmark
+          ./build/MicroTelemetryFrameworkEcosystemBenchmark 50000
+
   build-test:
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
@@ -179,7 +232,7 @@ jobs:
             -DMTF_BUILD_EXAMPLES=OFF -DMTF_FETCH_CONTRACTS=OFF \
             -DCMAKE_PREFIX_PATH="$PWD/stage"
           cmake --install mtf-build --prefix "$PWD/stage"
-          grep -F 'set(PACKAGE_VERSION "0.1.0")' \
+          grep -F 'set(PACKAGE_VERSION "0.1.1")' \
             stage/lib/cmake/mtf/mtfConfigVersion.cmake
       - name: Build and run consumer
         run: |

@@ -1,0 +1,8 @@
+library,scenario,operations_per_run,runs,median_throughput_per_second
+atomic_baseline,counter,1000000,7,123805000
+mtf_0.1.1,counter,1000000,7,123790000
+prometheus_cpp_1.3.0,counter,1000000,7,129835000
+opentelemetry_cpp_1.9.1,counter,1000000,7,34582800
+mtf_0.1.1,histogram,1000000,7,55744500
+prometheus_cpp_1.3.0,histogram,1000000,7,26377800
+opentelemetry_cpp_1.9.1,histogram,1000000,7,27365500

@@ -1,0 +1,3 @@
+scenario,transactions_per_run,runs,median_transactions_per_second,persisted_records_per_transaction
+ecosystem_direct,100000,7,5684630,2
+ecosystem_async,100000,7,1608860,2
