@@ -1,18 +1,16 @@
-# Usage examples
+# Полное использование
 
-The minimal [`examples/basic.cpp`](../examples/basic.cpp) shows common metric
-collection. [`examples/complete.cpp`](../examples/complete.cpp) additionally
-covers every instrument, events, spans, direct and asynchronous pipelines,
-batch publication, lifecycle and statistics.
+[`examples/basic.cpp`](../examples/basic.cpp) показывает основной сценарий, а
+[`examples/complete.cpp`](../examples/complete.cpp) — все instruments, события,
+spans, direct/async pipelines, batches, lifecycle и статистику.
 
-## Instruments and registry
+## Instruments и Registry
 
 ```cpp
 vosp::telemetry::Registry registry{256};
 auto requests = registry.counter("requests", {{"service", "gateway"}});
 auto active = registry.gauge("active");
 auto latency = registry.histogram("latency_ms", {1.0, 5.0, 25.0, 100.0});
-
 requests.add();
 active.set(4.0);
 active.add(-1.0);
@@ -20,52 +18,39 @@ latency.observe(4.2);
 const auto records = registry.collect();
 ```
 
-Handles share instrument state and are thread-safe. Names are unique across
-instrument kinds. Registry capacity and histogram boundaries are validated at
-construction/registration boundaries.
+Handles разделяют состояние и потокобезопасны. Имена уникальны между видами
+instruments. Capacity и границы histogram проверяются явно.
 
-## Events and spans
+## Events и spans
 
 ```cpp
-auto event = vosp::telemetry::Record::event(
-    "service.ready", {{"node", "one"}});
+auto event = vosp::telemetry::Record::event("service.ready", {{"node", "one"}});
 vosp::telemetry::Span span{"request", {{"route", "/health"}}};
 auto completed = span.finish(vosp::telemetry::SpanStatus::OK);
 ```
 
-`Span` is move-only and can finish once. `Record::payload()` contains
-`MetricData`, `EventData`, or `SpanData`; records own their names and attributes.
+`Span` является move-only и завершается один раз. `Record` владеет именем,
+attributes и одним из `MetricData`, `EventData`, `SpanData`.
 
-## Exporters and pipelines
+## Exporter и pipelines
 
 ```cpp
-class Exporter final : public vosp::telemetry::IExporter
-{
+class Exporter final : public vosp::telemetry::IExporter {
 public:
-    bool export_batch(std::span<const vosp::telemetry::Record> records) override;
+    bool export_batch(std::span<const vosp::telemetry::Record>) override;
 };
 
-auto exporter = std::make_shared<Exporter>();
-vsp::Telemetry direct{exporter};
-direct.publish(event);
-direct.publish(records);
-
 using Async = vosp::telemetry::pipeline_policy::Async<1024, 64>;
-vsp::TelemetryPipeline<Async> async{exporter};
-async.publish(records);
-async.flush();
-async.shutdown();
-const auto stats = async.stats();
+vsp::TelemetryPipeline<Async> pipeline{exporter};
+pipeline.publish(records);
+pipeline.flush();
+pipeline.shutdown();
+const auto stats = pipeline.stats();
 ```
 
-Async capacity and batch size are compile-time policy values. Producers block
-when the bounded queue is full. Shutdown rejects new records, drains accepted
-records, and joins the worker. Exporter exceptions become rejected records and
-`export_failures`; they do not terminate the worker.
+При заполненной очереди producer блокируется. Shutdown отклоняет новые записи,
+доставляет принятые и завершает worker. Исключение exporter учитывается в
+`rejected` и `export_failures`, не уничтожая worker.
 
-## Stable low-level surface
-
-`Record`, payload structures, instruments, `Registry`, `IExporter`,
-`MemoryExporter`, pipeline policies and `PipelineStats` are public. Instrument
-state classes are exposed for framework composition but should normally be
-obtained through `Registry`. Private queue state is not an extension seam.
+Публичны records, payload types, instruments, `Registry`, exporters, pipeline
+policies и `PipelineStats`. Внутренняя очередь не является extension point.

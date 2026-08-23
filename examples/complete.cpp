@@ -1,3 +1,6 @@
+/** @file
+ *  @brief Полный пример инструментов, событий, span и exporter-конвейеров.
+ */
 #include <vosp/telemetry.hpp>
 
 #include <array>
