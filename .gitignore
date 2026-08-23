@@ -1,4 +1,5 @@
 build/
+/b/
 build-*/
 cmake-build-*/
 install-*/

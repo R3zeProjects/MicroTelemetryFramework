@@ -19,6 +19,22 @@ versions only with the same compiler, machine, power plan, iteration count, and
 benchmark source. Debug numbers and results from different machines must not be
 presented as regressions or improvements.
 
+## Batched async publication (2026-08-23)
+
+The span overload now reserves available queue capacity and publishes a chunk
+under one lock and notification instead of repeating the scalar path for every
+record. Backpressure, bounded capacity, ownership, shutdown, and partial
+acceptance semantics are unchanged. Nine alternating A/B runs measured
+24.666M records/s for batches of 64 versus 10.418M/s (**+136.76%**); the
+observed ranges did not overlap. The scalar async median improved by 23.39%,
+but its wider overlapping ranges make that result directional rather than a
+hard regression gate. Evidence is stored in
+[`v0.1.1-batch-medians-2026-08-23.csv`](../benchmark-results/v0.1.1-batch-medians-2026-08-23.csv).
+
+The fixed-capacity power-of-two ring experiment was rejected: it reduced the
+measured async median by 10.3% compared with the existing deque. Bit masking is
+therefore not used where it makes the real workload slower.
+
 ## External comparison
 
 `MicroTelemetryFrameworkExternalBenchmark` is enabled by

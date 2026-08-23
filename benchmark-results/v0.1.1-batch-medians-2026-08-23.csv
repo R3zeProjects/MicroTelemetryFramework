@@ -1,0 +1,10 @@
+scenario,baseline_per_second,current_per_second,change_percent,min_per_second,max_per_second
+async_batch_64,10418300,24665900,136.76,21023300,29432400
+async_single,1970390,2431260,23.39,,
+counter,123900000,124000000,0.08,,
+external_counter_mtf,,124244000,,111074000,130302000
+external_counter_prometheus_1.3,,126577000,,124581000,132707000
+external_counter_opentelemetry_1.9.1,,37952400,,36380400,38946700
+external_histogram_mtf,,57219000,,56047800,60151800
+external_histogram_prometheus_1.3,,29737700,,28751700,30184800
+external_histogram_opentelemetry_1.9.1,,39217700,,37412700,40213800

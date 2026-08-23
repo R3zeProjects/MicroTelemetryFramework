@@ -29,8 +29,7 @@ struct Direct
 };
 
 /** @brief Exports bounded batches on one background worker. */
-template<std::size_t Capacity = 1024, std::size_t BatchSize = 64>
-struct Async
+template <std::size_t Capacity = 1024, std::size_t BatchSize = 64> struct Async
 {
     static_assert(Capacity > 0, "pipeline capacity must be positive");
     static_assert(BatchSize > 0, "pipeline batch size must be positive");
@@ -48,16 +47,13 @@ struct PipelineStats
     std::uint64_t export_failures = 0;
 };
 
-template<typename Policy = pipeline_policy::Direct>
-class Pipeline;
+template <typename Policy = pipeline_policy::Direct> class Pipeline;
 
 /** @brief Calling-thread exporter pipeline. */
-template<>
-class Pipeline<pipeline_policy::Direct>
+template <> class Pipeline<pipeline_policy::Direct>
 {
 public:
-    explicit Pipeline(std::shared_ptr<IExporter> exporter)
-        : exporter_{std::move(exporter)}
+    explicit Pipeline(std::shared_ptr<IExporter> exporter) : exporter_{std::move(exporter)}
     {
         if (!exporter_)
         {
@@ -65,7 +61,7 @@ public:
         }
     }
 
-    [[nodiscard]] bool publish(const Record& record)
+    [[nodiscard]] bool publish(const Record &record)
     {
         return publish(std::span{&record, std::size_t{1}});
     }
@@ -91,7 +87,7 @@ public:
         return false;
     }
 
-    [[nodiscard]] bool collect(const Registry& registry)
+    [[nodiscard]] bool collect(const Registry &registry)
     {
         const auto records = registry.collect();
         return publish(records);
@@ -102,11 +98,10 @@ public:
 
     [[nodiscard]] PipelineStats stats() const noexcept
     {
-        return {
-            .accepted = accepted_.load(std::memory_order_relaxed),
-            .exported = exported_.load(std::memory_order_relaxed),
-            .rejected = rejected_.load(std::memory_order_relaxed),
-            .export_failures = export_failures_.load(std::memory_order_relaxed)};
+        return {.accepted = accepted_.load(std::memory_order_relaxed),
+                .exported = exported_.load(std::memory_order_relaxed),
+                .rejected = rejected_.load(std::memory_order_relaxed),
+                .export_failures = export_failures_.load(std::memory_order_relaxed)};
     }
 
 private:
@@ -118,14 +113,13 @@ private:
 };
 
 /** @brief Bounded blocking pipeline with one batching exporter worker. */
-template<std::size_t Capacity, std::size_t BatchSize>
+template <std::size_t Capacity, std::size_t BatchSize>
 class Pipeline<pipeline_policy::Async<Capacity, BatchSize>>
 {
 private:
     struct State
     {
-        explicit State(std::shared_ptr<IExporter> destination)
-            : exporter{std::move(destination)}
+        explicit State(std::shared_ptr<IExporter> destination) : exporter{std::move(destination)}
         {
             batch.reserve(BatchSize);
         }
@@ -141,10 +135,10 @@ private:
         bool stopping = false;
         bool stopped = false;
         std::thread::id worker_id{};
-        std::atomic<std::uint64_t> accepted = 0;
-        std::atomic<std::uint64_t> exported = 0;
-        std::atomic<std::uint64_t> rejected = 0;
-        std::atomic<std::uint64_t> export_failures = 0;
+        std::uint64_t accepted = 0;
+        std::uint64_t exported = 0;
+        std::uint64_t rejected = 0;
+        std::uint64_t export_failures = 0;
     };
 
 public:
@@ -164,28 +158,27 @@ public:
         }
     }
 
-    Pipeline(const Pipeline&) = delete;
-    Pipeline& operator=(const Pipeline&) = delete;
-    Pipeline(Pipeline&&) = delete;
-    Pipeline& operator=(Pipeline&&) = delete;
+    Pipeline(const Pipeline &) = delete;
+    Pipeline &operator=(const Pipeline &) = delete;
+    Pipeline(Pipeline &&) = delete;
+    Pipeline &operator=(Pipeline &&) = delete;
 
     ~Pipeline() noexcept { shutdown(); }
 
-    /** @brief Enqueues an owned record, blocking while the bounded queue is full. */
+    /** @brief Enqueues an owned record, blocking while the bounded queue is full.
+     */
     [[nodiscard]] bool publish(Record record)
     {
         std::unique_lock lock{state_->mutex};
-        state_->space_available.wait(lock, [this]
-        {
-            return state_->stopping || state_->queue.size() < Capacity;
-        });
+        state_->space_available.wait(
+            lock, [this] { return state_->stopping || state_->queue.size() < Capacity; });
         if (state_->stopping)
         {
-            state_->rejected.fetch_add(1, std::memory_order_relaxed);
+            ++state_->rejected;
             return false;
         }
         state_->queue.push_back(std::move(record));
-        state_->accepted.fetch_add(1, std::memory_order_relaxed);
+        ++state_->accepted;
         lock.unlock();
         state_->work_available.notify_one();
         return true;
@@ -193,17 +186,36 @@ public:
 
     [[nodiscard]] bool publish(std::span<const Record> records)
     {
-        for (const auto& record : records)
+        std::size_t offset = 0;
+        while (offset < records.size())
         {
-            if (!publish(record))
+            std::unique_lock lock{state_->mutex};
+            state_->space_available.wait(lock, [this]
             {
+                return state_->stopping || state_->queue.size() < Capacity;
+            });
+            if (state_->stopping)
+            {
+                state_->rejected += records.size() - offset;
                 return false;
             }
+
+            const auto count = std::min(records.size() - offset,
+                                        Capacity - state_->queue.size());
+            const auto chunk = records.subspan(offset, count);
+            for (const auto& record : chunk)
+            {
+                state_->queue.push_back(record);
+            }
+            state_->accepted += count;
+            offset += count;
+            lock.unlock();
+            state_->work_available.notify_one();
         }
         return true;
     }
 
-    [[nodiscard]] bool collect(const Registry& registry)
+    [[nodiscard]] bool collect(const Registry &registry)
     {
         const auto records = registry.collect();
         return publish(records);
@@ -217,10 +229,9 @@ public:
         {
             return false;
         }
-        state_->idle.wait(lock, [this]
-        {
-            return (state_->queue.empty() && state_->in_flight == 0) || state_->stopped;
-        });
+        state_->idle.wait(
+            lock, [this]
+            { return (state_->queue.empty() && state_->in_flight == 0) || state_->stopped; });
         return state_->queue.empty() && state_->in_flight == 0;
     }
 
@@ -250,29 +261,27 @@ public:
 
     [[nodiscard]] PipelineStats stats() const noexcept
     {
-        return {
-            .accepted = state_->accepted.load(std::memory_order_relaxed),
-            .exported = state_->exported.load(std::memory_order_relaxed),
-            .rejected = state_->rejected.load(std::memory_order_relaxed),
-            .export_failures = state_->export_failures.load(std::memory_order_relaxed)};
+        std::scoped_lock lock{state_->mutex};
+        return {.accepted = state_->accepted,
+                .exported = state_->exported,
+                .rejected = state_->rejected,
+                .export_failures = state_->export_failures};
     }
 
 private:
-    static void run(const std::shared_ptr<State>& state) noexcept
+    static void run(const std::shared_ptr<State> &state) noexcept
     {
         {
             std::scoped_lock lock{state->mutex};
             state->worker_id = std::this_thread::get_id();
         }
-        auto& batch = state->batch;
+        auto &batch = state->batch;
         for (;;)
         {
             {
                 std::unique_lock lock{state->mutex};
                 state->work_available.wait(lock, [&]
-                {
-                    return state->stopping || !state->queue.empty();
-                });
+                                           { return state->stopping || !state->queue.empty(); });
                 if (state->queue.empty() && state->stopping)
                 {
                     state->stopped = true;
@@ -302,18 +311,17 @@ private:
                 // The worker survives exporter failures and records the failed batch.
                 exported = false;
             }
-            if (exported)
-            {
-                state->exported.fetch_add(batch.size(), std::memory_order_relaxed);
-            }
-            else
-            {
-                state->rejected.fetch_add(batch.size(), std::memory_order_relaxed);
-                state->export_failures.fetch_add(1, std::memory_order_relaxed);
-            }
-
             {
                 std::scoped_lock lock{state->mutex};
+                if (exported)
+                {
+                    state->exported += batch.size();
+                }
+                else
+                {
+                    state->rejected += batch.size();
+                    ++state->export_failures;
+                }
                 state->in_flight -= batch.size();
                 if (state->queue.empty() && state->in_flight == 0)
                 {

@@ -1,5 +1,6 @@
 #include <vosp/telemetry.hpp>
 
+#include <array>
 #include <atomic>
 #include <cmath>
 #include <iostream>
@@ -12,7 +13,7 @@ namespace
 {
 using namespace vosp::telemetry;
 
-[[nodiscard]] bool check(bool condition, const char* message)
+[[nodiscard]] bool check(bool condition, const char *message)
 {
     if (!condition)
     {
@@ -24,8 +25,7 @@ using namespace vosp::telemetry;
 [[nodiscard]] bool instruments_are_thread_safe()
 {
     Registry registry;
-    auto counter = registry.counter(
-        "requests", {Attribute{.key = "service", .value = "api"}});
+    auto counter = registry.counter("requests", {Attribute{.key = "service", .value = "api"}});
     auto same_counter = registry.counter("requests");
     constexpr std::size_t workers = 4;
     constexpr std::size_t iterations = 25'000;
@@ -33,15 +33,16 @@ using namespace vosp::telemetry;
     threads.reserve(workers);
     for (std::size_t worker = 0; worker < workers; ++worker)
     {
-        threads.emplace_back([counter]() mutable
-        {
-            for (std::size_t index = 0; index < iterations; ++index)
+        threads.emplace_back(
+            [counter]() mutable
             {
-                static_cast<void>(counter.add());
-            }
-        });
+                for (std::size_t index = 0; index < iterations; ++index)
+                {
+                    static_cast<void>(counter.add());
+                }
+            });
     }
-    for (auto& thread : threads)
+    for (auto &thread : threads)
     {
         thread.join();
     }
@@ -49,17 +50,15 @@ using namespace vosp::telemetry;
     auto gauge = registry.gauge("load");
     const bool gauge_set = gauge.set(0.75);
     auto histogram = registry.histogram("latency_ms", {1.0, 10.0, 100.0});
-    const bool observations = histogram.observe(0.5) && histogram.observe(10.0) &&
-                              histogram.observe(250.0);
+    const bool observations =
+        histogram.observe(0.5) && histogram.observe(10.0) && histogram.observe(250.0);
     const auto records = registry.collect();
 
-    const auto histogram_record = std::ranges::find_if(records, [](const Record& record)
-    {
-        return record.name() == "latency_ms";
-    });
-    const auto* data = histogram_record == records.end()
-        ? nullptr
-        : std::get_if<MetricData>(&histogram_record->payload());
+    const auto histogram_record = std::ranges::find_if(records, [](const Record &record)
+                                                       { return record.name() == "latency_ms"; });
+    const auto *data = histogram_record == records.end()
+                           ? nullptr
+                           : std::get_if<MetricData>(&histogram_record->payload());
 
     return check(counter.value() == workers * iterations, "concurrent counter") &&
            check(same_counter.value() == counter.value(), "shared named instrument") &&
@@ -79,7 +78,7 @@ using namespace vosp::telemetry;
     {
         static_cast<void>(registry.gauge("same"));
     }
-    catch (const std::logic_error&)
+    catch (const std::logic_error &)
     {
         return true;
     }
@@ -96,7 +95,7 @@ using namespace vosp::telemetry;
     {
         static_cast<void>(registry.gauge("second"));
     }
-    catch (const std::length_error&)
+    catch (const std::length_error &)
     {
         capacity_rejected = true;
     }
@@ -105,7 +104,7 @@ using namespace vosp::telemetry;
         Registry another;
         static_cast<void>(another.histogram("invalid", {10.0, 1.0}));
     }
-    catch (const std::invalid_argument&)
+    catch (const std::invalid_argument &)
     {
         boundaries_rejected = true;
     }
@@ -115,16 +114,14 @@ using namespace vosp::telemetry;
 
 [[nodiscard]] bool records_and_spans_work()
 {
-    const auto event = Record::event(
-        "startup", {Attribute{.key = "node", .value = "one"}});
+    const auto event = Record::event("startup", {Attribute{.key = "node", .value = "one"}});
     Span span{"request"};
     const auto completed = span.finish(SpanStatus::OK);
-    const bool span_payload = completed.has_value() &&
-        std::holds_alternative<SpanData>(completed->payload());
+    const bool span_payload =
+        completed.has_value() && std::holds_alternative<SpanData>(completed->payload());
     return check(event.name() == "startup", "event name") &&
            check(std::holds_alternative<EventData>(event.payload()), "event payload") &&
-           check(completed.has_value(), "span completion") &&
-           check(span_payload, "span payload") &&
+           check(completed.has_value(), "span completion") && check(span_payload, "span payload") &&
            check(!span.finish().has_value(), "span completes once");
 }
 
@@ -155,13 +152,27 @@ using namespace vosp::telemetry;
             return check(false, "async acceptance");
         }
     }
+    std::vector<Record> batch;
+    batch.reserve(17);
+    for (std::size_t index = 0; index < 17; ++index)
+    {
+        batch.push_back(Record::event("queued batch"));
+    }
+    if (!pipeline.publish(batch))
+    {
+        return check(false, "async batch acceptance");
+    }
     const bool flushed = pipeline.flush();
     pipeline.shutdown();
+    const bool rejected_single = !pipeline.publish(Record::event("late"));
+    const std::array rejected_batch{
+        Record::event("late batch"), Record::event("late batch"), Record::event("late batch")};
+    const bool rejected_all = !pipeline.publish(rejected_batch);
     const auto stats = pipeline.stats();
-    return check(flushed, "async flush") &&
-           check(exporter->size() == 100, "async drain") &&
-           check(stats.accepted == 100 && stats.exported == 100, "async stats") &&
-           check(!pipeline.publish(Record::event("late")), "shutdown rejects work");
+    return check(flushed, "async flush") && check(exporter->size() == 117, "async drain") &&
+           check(stats.accepted == 117 && stats.exported == 117, "async stats") &&
+           check(rejected_single && rejected_all, "shutdown rejects work") &&
+           check(stats.rejected == 4, "shutdown rejection stats");
 }
 
 [[nodiscard]] bool async_pipeline_accepts_concurrent_producers()
@@ -176,19 +187,20 @@ using namespace vosp::telemetry;
     std::atomic<bool> accepted = true;
     for (std::size_t producer = 0; producer < producers; ++producer)
     {
-        threads.emplace_back([&pipeline, &accepted]
-        {
-            for (std::size_t index = 0; index < records_per_producer; ++index)
+        threads.emplace_back(
+            [&pipeline, &accepted]
             {
-                if (!pipeline.publish(Record::event("concurrent")))
+                for (std::size_t index = 0; index < records_per_producer; ++index)
                 {
-                    accepted.store(false, std::memory_order_relaxed);
-                    return;
+                    if (!pipeline.publish(Record::event("concurrent")))
+                    {
+                        accepted.store(false, std::memory_order_relaxed);
+                        return;
+                    }
                 }
-            }
-        });
+            });
     }
-    for (auto& thread : threads)
+    for (auto &thread : threads)
     {
         thread.join();
     }
@@ -197,17 +209,16 @@ using namespace vosp::telemetry;
     pipeline.shutdown();
     return check(accepted.load(std::memory_order_relaxed), "concurrent acceptance") &&
            check(flushed, "concurrent flush") &&
-           check(exporter->size() == producers * records_per_producer,
-                 "concurrent delivery");
+           check(exporter->size() == producers * records_per_producer, "concurrent delivery");
 }
 } // namespace
 
 int main()
 {
     return instruments_are_thread_safe() && registry_rejects_conflicts() &&
-                   registry_enforces_bounds() &&
-                   records_and_spans_work() && direct_pipeline_works() &&
-                   async_pipeline_drains() && async_pipeline_accepts_concurrent_producers()
+                   registry_enforces_bounds() && records_and_spans_work() &&
+                   direct_pipeline_works() && async_pipeline_drains() &&
+                   async_pipeline_accepts_concurrent_producers()
                ? 0
                : 1;
 }
