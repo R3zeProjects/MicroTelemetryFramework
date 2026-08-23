@@ -60,6 +60,10 @@ before shutdown completes.
 
 ## Dependency
 
+The complete standalone and installed-package procedure is documented in the
+[installation guide](docs/INSTALLATION.md). Direct, asynchronous and custom
+exporter examples are collected in [usage examples](docs/USAGE_EXAMPLES.md).
+
 MTF depends on
 [MicroContractsFramework](https://github.com/R3zeProjects/MicroContractsFramework)
 `0.5.x` for structural telemetry concepts. MCF owns no telemetry runtime state.
@@ -151,6 +155,8 @@ valuable when the real exporter blocks or has bursty latency.
 ## Documentation
 
 - [Architecture](docs/ARCHITECTURE.md)
+- [Installation](docs/INSTALLATION.md)
+- [Usage examples](docs/USAGE_EXAMPLES.md)
 - [API and concurrency contracts](docs/API_CONTRACTS.md)
 - [Benchmark methodology](docs/BENCHMARKS.md)
 - [Ecosystem capability and maturity assessment](docs/ECOSYSTEM.md)

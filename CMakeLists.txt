@@ -108,6 +108,12 @@ endif()
 if(MTF_BUILD_EXAMPLES)
     add_executable(MicroTelemetryFrameworkExample examples/basic.cpp)
     target_link_libraries(MicroTelemetryFrameworkExample PRIVATE MicroTelemetryFramework)
+    add_executable(MicroTelemetryFrameworkCompleteExample examples/complete.cpp)
+    target_link_libraries(MicroTelemetryFrameworkCompleteExample PRIVATE MicroTelemetryFramework)
+    if(BUILD_TESTING)
+        add_test(NAME MicroTelemetryFramework.Example.Complete
+            COMMAND MicroTelemetryFrameworkCompleteExample)
+    endif()
 endif()
 
 if(MTF_BUILD_BENCHMARKS)
