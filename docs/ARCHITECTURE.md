@@ -7,6 +7,31 @@ and exporter scheduling. It deliberately does not own network protocols,
 persistent storage, error logging, service discovery, or backend-specific
 schemas.
 
+## Принципы работы
+
+Инструментирование отделено от экспорта. Instruments изменяют собственное
+агрегированное состояние, snapshots превращают его в наблюдения, а events и
+spans сразу создают владеющий `Record`. Поэтому exporter может сохранить запись
+после возврата producer-вызова.
+
+```text
+обновление instrument -> атомарное/защищённое состояние -> snapshot -> Record
+event/span ------------------------------------------------------^
+Record -> direct pipeline -> exporter в producer-потоке
+Record -> async pipeline  -> ограниченная очередь -> worker -> exporter
+```
+
+Direct pipeline передаёт producer задержку exporter. Async pipeline переносит
+принятые записи в очередь фиксированной ёмкости, применяет backpressure,
+экспортирует ограниченные batch, после начала shutdown отклоняет публикации и
+перед join выгружает уже принятые записи. Callback exporter выполняется без
+блокировки очереди, а pipeline разделяет владение exporter.
+
+Синхронизация соответствует инварианту данных: counter и gauge используют
+relaxed atomics, histogram — один mutex для согласованных buckets, count и sum.
+Лимиты registry и очереди ограничивают память. Протоколы backend, retry,
+persistence и глобальные registry остаются явным выбором приложения.
+
 ## Dependency direction
 
 ```text
