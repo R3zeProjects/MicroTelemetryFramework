@@ -7,6 +7,33 @@ and exporter scheduling. It deliberately does not own network protocols,
 persistent storage, error logging, service discovery, or backend-specific
 schemas.
 
+## Operating principles
+
+Instrumentation and export are intentionally separate. Instruments update
+their owned aggregation state; snapshots turn that state into observations.
+Events and spans create owning `Record` envelopes immediately, so exporters may
+retain records after the producer call returns.
+
+```text
+instrument update -> atomic/mutex-protected state -> snapshot -> Record
+event/span -----------------------------------------------^
+Record -> direct pipeline -> exporter on producer thread
+Record -> async pipeline  -> bounded queue -> worker -> exporter
+```
+
+The direct pipeline exposes exporter latency to the producer. The asynchronous
+pipeline moves accepted records into a fixed-capacity queue, applies
+backpressure at capacity, exports bounded batches, rejects publication after
+shutdown begins, and drains already accepted records before joining its worker.
+Exporter callbacks run without the queue lock and the pipeline retains shared
+ownership of the exporter.
+
+Metric synchronization matches the required invariant: counters and gauges use
+relaxed atomics for independent values, while histogram snapshots use one mutex
+for internally consistent buckets, count, and sum. Registry and queue limits
+bound memory growth. Backend protocols, retries, persistence, and global
+registries remain explicit application-level composition choices.
+
 ## Dependency direction
 
 ```text
