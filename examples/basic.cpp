@@ -1,6 +1,3 @@
-/** @file
- *  @brief Минимальный пример построения telemetry-контура.
- */
 #include <vosp/telemetry.hpp>
 
 #include <iostream>

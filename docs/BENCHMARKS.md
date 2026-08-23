@@ -1,57 +1,58 @@
-# Benchmark methodology
+# Методология бенчмаркинга
 
-`MicroTelemetryFrameworkBenchmark` is an opt-in repository target. It is never
-installed or exported by the CMake package.
+`MicroTelemetryFrameworkBenchmark` — это репозиторий с выборочной подпиской. Он никогда
+не устанавливается и не экспортируется пакетом CMake.
 
-The initial baseline executes two one-million-operation scenarios:
+Начальная базовая линия выполняет два сценария по одному миллиону операций:
 
-1. relaxed atomic increments through a copied `Counter` handle;
-2. construction and publication of owning event records through an async
-   pipeline configured with capacity 1024 and batch size 64.
+1. расслабленные атомарные приращения через скопированную ручку `Counter`;
+2. конструирование и публикация записей о владении событиями через асинхронный pipeline,
+   настроенный с ёмкостью 1024 и размером пакета 64.
 
-The async exporter performs one relaxed atomic addition per batch and verifies
-that all records were delivered. Timing includes queue contention,
-backpressure, record moves, worker wakeups, and exporter invocation. It excludes
-process startup and pipeline construction.
+Асинхронный exporter выполняет одно ослабленное атомарное сложение за пакет и проверяет,
+что все записи были доставлены. Время включает конкуренцию за очередь, backpressure,
+перемещения записей, пробуждения worker и вызовы exporter. Оно не включает запуск
+процесса и создание pipeline.
 
-Results in the README are the median of five consecutive Release runs. Compare
-versions only with the same compiler, machine, power plan, iteration count, and
-benchmark source. Debug numbers and results from different machines must not be
-presented as regressions or improvements.
+Результаты в README являются медианой пяти последовательных запусков Release.
+Сравнивайте версии только с одинаковым компилятором, машиной, планом энергопотребления,
+количеством итераций и исходным кодом бенчмарка. Нельзя представлять отладочные данные и
+результаты с разных машин как регрессии или улучшения.
 
-## Batched async publication (2026-08-23)
+## Пакетная асинхронная публикация (2026-08-23)
 
-The span overload now reserves available queue capacity and publishes a chunk
-under one lock and notification instead of repeating the scalar path for every
-record. Backpressure, bounded capacity, ownership, shutdown, and partial
-acceptance semantics are unchanged. Nine alternating A/B runs measured
-24.666M records/s for batches of 64 versus 10.418M/s (**+136.76%**); the
-observed ranges did not overlap. The scalar async median improved by 23.39%,
-but its wider overlapping ranges make that result directional rather than a
-hard regression gate. Evidence is stored in
+Перегрузка span теперь резервирует доступную емкость очереди и публикует блок под одним
+замком и уведомлением, вместо того чтобы повторять скалярный путь для каждой записи.
+Обратное давление, ограниченная емкость, владение, shutdown и семантика частичного
+принятия остались без изменений. Девять чередующихся запусков A/B измерили 24.666M
+записей/с для пакетов из 64 против 10.418M/с (**+136.76%**); наблюдаемые диапазоны не
+пересекались. Медиана скалярного асинхронного выполнения улучшилась на 23.39%, но ее
+более широкие пересекающиеся диапазоны делают этот результат ориентировочным, а не
+строгим индикатором ухудшения. Доказательства сохранены в
 [`v0.1.1-batch-medians-2026-08-23.csv`](../benchmark-results/v0.1.1-batch-medians-2026-08-23.csv).
 
-The fixed-capacity power-of-two ring experiment was rejected: it reduced the
-measured async median by 10.3% compared with the existing deque. Bit masking is
-therefore not used where it makes the real workload slower.
+Эксперимент с кольцом фиксированной ёмкости с размером, равным степени двух, был
+отклонён: он уменьшал измеренную асинхронную медиану на 10.3% по сравнению с
+существующей двусторонней очередью. Поэтому побитовое маскирование не используется там,
+где оно замедляет реальную нагрузку.
 
-## External comparison
+## Внешнее сравнение
 
-`MicroTelemetryFrameworkExternalBenchmark` is enabled by
-`MTF_BUILD_EXTERNAL_COMPARISON_BENCHMARKS=ON`. CMake fetches immutable commits:
+`MicroTelemetryFrameworkExternalBenchmark` включен
+`MTF_BUILD_EXTERNAL_COMPARISON_BENCHMARKS=ON`. CMake получает неизменяемые коммиты:
 
 - prometheus-cpp 1.3.0: `e5fada43131d251e9c4786b04263ce98b6767ba5`;
 - OpenTelemetry C++ 1.9.1: `770fce3c4095f6dc852fd80fb0810936b723be9a`.
 
-Each timed counter loop adds `1.0` to one unlabelled instrument. Each histogram
-loop observes `4.2`; MTF and prometheus-cpp use boundaries 1, 5, 25, and 100.
-OpenTelemetry uses its SDK default histogram aggregation. Instrument creation
-and final collection are excluded. MTF, prometheus-cpp, and OpenTelemetry
-collection are validated after timing. The atomic baseline quantifies the
-minimum synchronization cost on this machine.
+Каждый цикл с отслеживанием времени добавляет `1.0` к одному не маркированному
+инструменту. Каждый цикл гистограммы наблюдает `4.2`; MTF и prometheus-cpp используют
+границы 1, 5, 25, и 100.. OpenTelemetry использует стандартную агрегацию гистограмм SDK.
+Создание инструментов и окончательный сбор исключены. MTF, prometheus-cpp и сбор
+OpenTelemetry проверяются после измерения времени. Атомная базовая линия количественно
+определяет минимальную стоимость синхронизации на этой машине.
 
-The recorded values are seven-run medians from a Clang 22.1.6 Release build on
-Windows and AMD Ryzen 7 PRO 1700X. The dataset is
+Зафиксированные значения являются медианами семи запусков на сборке Clang 22.1.6 Release
+под Windows и AMD Ryzen 7 PRO 1700X. Набор данных —
 [`v0.1.1-external-medians-2026-08-22.csv`](../benchmark-results/v0.1.1-external-medians-2026-08-22.csv).
 
 ```sh
@@ -62,22 +63,24 @@ cmake --build build-external --parallel \
 ./build-external/MicroTelemetryFrameworkExternalBenchmark 1000000
 ```
 
-## Full ecosystem benchmark
+## Полный эталон экосистемы
 
-`MicroTelemetryFrameworkEcosystemBenchmark` is enabled by
-`MTF_BUILD_ECOSYSTEM_BENCHMARKS=ON`. It pins:
+`MicroTelemetryFrameworkEcosystemBenchmark` включён `MTF_BUILD_ECOSYSTEM_BENCHMARKS=ON`.
+Он закрепляет:
 
 - MCF `b9f78d3f529097ac1dae963b06274a6110b39c1a`;
 - MEF `c11c3aa25814baa1a889ab1f80b718e59e3a24a9`;
 - MPF `00aec475b283812c232758c539e70ce8fae09f64`;
-- the checked-out MTF source.
+- проверенный исходный код MTF.
 
-One transaction creates one MEF log and one MTF event, updates one counter, and
-stores both owning records in a pre-reserved thread-safe in-memory MPF target.
-The timer includes value construction, logger dispatch, conversion, queueing
-where selected, and persistence copies. It excludes setup and final validation.
+Одна транзакция создает один журнал MEF и одно событие MTF, обновляет один счетчик и
+сохраняет оба связанных записа в заранее зарезервированной целевой thread-safe в памяти
+MPF. Таймер включает построение значения, logger dispatch, конвертацию, постановку в
+очередь там, где это выбрано, и копирование persistence. Он не включает настройку и
+окончательную проверку.
 
-Seven-run medians were measured with the same compiler and machine and are stored in
+Медианы семи прогонов были измерены с использованием одного и того же компилятора и
+машины и сохранены в
 [`v0.1.1-ecosystem-medians-2026-08-22.csv`](../benchmark-results/v0.1.1-ecosystem-medians-2026-08-22.csv).
 
 ```sh

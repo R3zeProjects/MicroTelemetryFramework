@@ -1,6 +1,7 @@
 # Установка
 
-MTF является header-only C++23 package и требует CMake 3.25, threads и MCF.
+MTF — это пакет header-only C++23, требующий CMake 3.25, потоков и
+MicroContractsFramework.
 
 ```sh
 git clone https://github.com/R3zeProjects/MicroContractsFramework.git
@@ -12,13 +13,13 @@ cmake --build build/mtf --parallel
 ctest --test-dir build/mtf --output-on-failure
 ```
 
-Установите MCF и MTF в один prefix:
+Установите MCF и MTF в один префикс, затем используйте их с помощью:
 
 ```cmake
 find_package(mtf 0.1 REQUIRED CONFIG)
 target_link_libraries(application PRIVATE vosp::telemetry)
 ```
 
-Передайте prefix через `CMAKE_PREFIX_PATH` и подключайте
-`<vosp/telemetry.hpp>`. При встраивании отключите примеры и тесты через
-`MTF_BUILD_EXAMPLES=OFF` и `BUILD_TESTING=OFF`. Benchmarks не устанавливаются.
+Пропустите префикс через `CMAKE_PREFIX_PATH`. Основной заголовок — `<vosp/telemetry.hpp>`. Установите `MTF_BUILD_EXAMPLES=OFF` и `BUILD_TESTING=OFF` при
+встраивании MTF в качестве зависимости. Бенчмарки и закрепленные сравнения никогда не
+устанавливаются.

@@ -1,62 +1,64 @@
-# Public API and concurrency contracts
+# Публичный API и контракты параллелизма
 
-## Compatibility
+## Совместимость
 
-The public API is every declaration reachable from `<vosp/telemetry.hpp>`.
-Before 1.0, minor releases may change source compatibility when recorded in the
-changelog. Patch releases preserve documented source behavior. No stable ABI is
-promised before 1.0; consumers must rebuild this header-only library.
+Публичное API — это каждое объявление, доступное из `<vosp/telemetry.hpp>`. До 1.0,
+мелкие релизы могут изменять совместимость с исходным кодом, когда это зафиксировано в
+журнале изменений. Патч-релизы сохраняют документированное поведение исходного кода.
+Стабильный ABI не гарантируется до 1.0; пользователи должны перестроить эту библиотеку
+header-only.
 
-## Ownership
+## Собственность
 
-- `Record` and `Attribute` own all strings they expose.
-- instrument handles share ownership of their state;
-- `Registry` owns registered state but removing a name does not invalidate an
-  already returned handle;
-- every `Pipeline` shares ownership of its `IExporter`;
-- an async queue owns every accepted record until export completes.
+- `Record` и `Attribute` владеют всеми строками, которые они предоставляют.
+- инструмент обрабатывает долю владение их состояния;
+- `Registry` владеет зарегистрированным состоянием, но удаление имени не аннулирует уже
+  возвращённый хэндл;
+- каждый `Pipeline` делится владение своего `IExporter`;
+- Асинхронная очередь владеет каждой принятой записью до завершения экспорта.
 
-## Validation
+## Проверка
 
-- instrument names must be non-empty and unique across kinds;
-- registry capacity must be in `[1, 1,000,000]`;
-- counters reject negative and non-finite deltas;
-- gauges reject non-finite values;
-- histograms reject non-finite observations and require finite, strictly
-  increasing boundaries;
-- a span produces at most one completed record;
-- null exporters are rejected during pipeline construction.
+- Названия инструментов должны быть непустыми и уникальными для каждого вида;
+- Вместимость registry должна быть в `[1, 1,000,000]`;
+- счётчики отклоняют отрицательные и недопустимые дельты;
+- шкалки отвергают бесконечные значения;
+- гистограммы отбрасывают бесконечные наблюдения и требуют конечных, строго возрастающих
+  границ;
+- span создаёт не более одной завершённой записи;
+- null exporters отклоняются во время построения pipeline.
 
-Invalid instrument definitions throw `std::invalid_argument` or
-`std::logic_error`. Hot-path numeric updates return `bool` and do not throw.
+Неверные определения инструментов вызывают `std::invalid_argument` или
+`std::logic_error`. Быстрые числовые обновления возвращают `bool` и не вызывают
+исключений.
 
-## Thread-safety matrix
+## Матрица потокобезопасности
 
-| Type | Concurrent operations | Contract |
+| Тип | Параллельные операции | Контракт |
 | --- | --- | --- |
-| `Record` | const reads | safe after publication |
-| `Counter` | `add`, `value` | atomic and thread-safe |
-| `Gauge` | `set`, `add`, `value` | atomic and thread-safe |
-| `Histogram` | `observe`, registry snapshot | serialized and consistent |
-| `Registry` | create, collect, remove, clear, size | internally synchronized |
-| `MemoryExporter` | export, snapshot, size, clear | internally synchronized |
-| direct `Pipeline` | publish and stats | exporter must accept concurrent callbacks |
-| async `Pipeline` | publish, collect, flush, shutdown, stats | internally synchronized; one exporter callback at a time |
+| `Record` | const читает | безопасно после публикации |
+| `Counter` | `add`, `value` | атомный и thread-safe |
+| `Gauge` | `set`, `add`, `value` | атомный и thread-safe |
+| `Histogram` | `observe`, registry snapshot | сериализованный и последовательный |
+| `Registry` | создавать, собирать, удалять, очищать, размер | внутренне синхронизированный |
+| `MemoryExporter` | экспорт, snapshot, размер, очистить | внутренне синхронизированный |
+| прямой `Pipeline` | публикация и статистика | exporter должен принимать одновременные обратные вызовы |
+| асинхронный `Pipeline` | публиковать, собирать, flush, shutdown, статистика | внутренне синхронизировано; один вызов exporter за раз |
 
-Async `flush()` returns `false` when invoked recursively from its own exporter
-worker because waiting for that callback would deadlock. `shutdown()` is
-idempotent, rejects new work, and drains already accepted records. Destruction
-concurrent with calls through the same pipeline object remains unsupported;
-the owner must end producer access before destroying it.
+Асинхронный `flush()` возвращает `false` при рекурсивном вызове из своего собственного
+exporter worker, потому что ожидание этого обратного вызова приведет к взаимной
+блокировке. `shutdown()` идемпотентен, отвергает новую работу и опустошает уже принятые
+записи. Одновременное уничтожение при вызовах через тот же объект pipeline остается
+неподдерживаемым; владелец должен завершить доступ производителя перед его уничтожением.
 
-## Exporter contract
+## Контракт экспортера
 
-An exporter implements:
+An exporter реализует:
 
 ```cpp
 bool export_batch(std::span<const vosp::telemetry::Record> records);
 ```
 
-Returning `true` acknowledges the complete batch. Returning `false` or throwing
-marks the complete batch failed; MTF does not retry implicitly. Exporters must
-not retain the span itself, but may copy records from it.
+Возврат `true` подтверждает полную обработку пакета. Возврат `false` или возбуждение
+исключения обозначает, что весь пакет завершился с ошибкой; MTF не делает retry неявно.
+Экспортеры не должны сохранять сам span, но могут копировать из него записи.

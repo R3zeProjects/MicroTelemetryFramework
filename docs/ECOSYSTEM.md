@@ -1,58 +1,58 @@
-# VOSP ecosystem assessment
+# Оценка экосистемы VOSP
 
-## Current composition
+## Текущий состав
 
-| Framework | Benchmarked release | Responsibility |
+| Фреймворк | Выпуск с бенчмарками | Ответственность |
 | --- | --- | --- |
-| MCF | 0.5.0-beta | compile-time structural contracts |
-| MEF | 0.6.0-beta | errors, logging, bounded workers |
-| MPF | 0.2.0-beta | persistence values, codecs, stores and MEF sink |
-| MTF | 0.1.1-beta | metrics, events, spans and exporter pipelines |
+| MCF | 0.5.0-бета | compile-time структурные контракты |
+| MEF | 0.6.0-бета | ошибки, логгирование, ограниченный workers |
+| MPF | 0.2.0-бета | Значения persistence, codecs, хранятся и MEF sink |
+| MTF | 0.1.1-бета | метрики, события, spans и exporter pipelines |
 
-Dependencies point toward MCF or are composed in the application. MCF has no
-runtime state. The ecosystem benchmark pins exact commits and places the only
-MTF-to-MPF exporter implementation in the composition root; neither framework
-depends on the other.
+Зависимости указывают на MCF или формируются в приложении. У MCF нет состояния runtime.
+Оценочный показатель экосистемы фиксирует точные коммиты и размещает единственную
+реализацию MTF-to-MPF exporter в корне композиции; ни фреймворк не зависит от другого.
 
-## What the ecosystem can build today
+## То, что экосистема может построить сегодня
 
-- classify and route typed failures;
-- log them synchronously or asynchronously;
-- persist structured log records;
-- count operations and observe latency distributions;
-- emit events and completed spans;
-- export telemetry synchronously or through a bounded queue;
-- apply backpressure and perform drain-first shutdown;
-- replace structural error and exporter implementations at compile time.
+- классифицировать и направлять типизированные ошибки;
+- логировать их синхронно или асинхронно;
+- сохранять структурированные журнальные записи;
+- подсчитывать операции и наблюдать распределение задержек;
+- излучать события и завершено spans;
+- экспортировать телеметрию синхронно или через ограниченную очередь;
+- примените backpressure и выполните предварительное опорожнение shutdown;
+- замените структурную ошибку и реализации exporter на этапе компиляции.
 
-The benchmarked transaction performs one MEF log operation, one MTF counter
-update, one MTF event export, and persists both produced records through an
-MPF-compatible journal. MCF validates the boundaries at compile time.
+Оцененная транзакция выполняет одну операцию журнала MEF, одно обновление счетчика MTF,
+один экспорт события MTF и сохраняет оба созданных записа через журнал, совместимый с
+MPF. MCF проверяет границы в этапе компиляции.
 
-## Maturity assessment
+## Оценка зрелости
 
-| Area | Assessment | Evidence / gap |
+| Площадь | Оценка | Доказательство / пробел |
 | --- | --- | --- |
-| Architecture | strong beta | directional dependencies, owning values, bounded state |
-| API clarity | strong beta | canonical `<vosp/...>` headers and policy-selected modes |
-| Performance evidence | strong beta | pinned external and full-contour benchmarks |
-| Safety validation | strong beta | GCC/Clang/MSVC, sanitizers, TSan, clang-tidy, package consumers |
-| Interoperability | developing | structural exporters exist; standard wire exporters are not shipped |
-| Operational maturity | early | no long-running production deployment or incident history yet |
-| Compatibility | beta | all components remain pre-1.0 and do not promise stable ABI |
+| Архитектура | сильный бета | направленные зависимости, собственные значения, ограниченное состояние |
+| Ясность API | сильный бета | канонические заголовки `<vosp/...>` и режимы, выбранные политикой |
+| Доказательства эффективности | сильный бета | закрепленные внешние и полно-контурные эталонные испытания |
+| Проверка безопасности | сильный бета | GCC/Clang/MSVC, санитайзеры, TSan, clang-tidy, потребители пакетов |
+| Взаимодействие | развивающийся | структурный exporters существует; стандартные провода exporters не поставляются |
+| Операционная зрелость | ранний | пока нет длительных производственных развертываний или истории инцидентов |
+| Совместимость | бета | all components remain pre-1.0 and do not promise stable ABI |
 
-Overall, the ecosystem is suitable for portfolio demonstration, prototypes,
-internal tools, controlled services, and pilot integrations. It is not yet an
-OpenTelemetry replacement or a universally production-proven platform.
+В целом, экосистема подходит для демонстрации портфолио, прототипов, внутренних
+инструментов, контролируемых сервисов и пилотных интеграций. Она пока не является
+заменой OpenTelemetry или универсально проверенной платформой для продакшена.
 
-## Main gaps before 1.0
+## Основные пробелы перед 1.0
 
-1. one real service integration with sustained load and failure injection;
-2. stable cross-framework version compatibility policy;
-3. OpenTelemetry/Prometheus wire exporters and trace-context propagation;
-4. persistence crash-recovery and durability guarantees;
-5. longer Linux soak, packaging on multiple distributions, and release signing;
-6. user feedback from an integration not authored inside this ecosystem.
+1. одна реальная интеграция сервиса с поддерживаемой нагрузкой и введением сбоев;
+2. стабильная политика совместимости версий между фреймворк
+3. OpenTelemetry/Prometheus передача exporters и распространение trace-context;
+4. persistence аварийное восстановление и гарантии надежности;
+5. длительное тестирование Linux, упаковка для нескольких дистрибутивов и подпись
+   релиза;
+6. отзывы пользователей о интеграции, не созданной внутри этой экосистемы.
 
-The engineering foundation is credible; the remaining work is primarily
-interoperability and operational evidence rather than another core rewrite.
+Инженерная база заслуживает доверия; оставшаяся работа в основном связана с
+совместимостью и эксплуатационными доказательствами, а не с очередной переработкой ядра.

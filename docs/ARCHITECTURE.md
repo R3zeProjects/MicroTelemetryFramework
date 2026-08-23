@@ -1,38 +1,41 @@
-# MicroTelemetryFramework architecture
+# архитектура MicroTelemetryFramework
 
-## Scope
+## Область
 
-MTF owns in-process telemetry values, metric aggregation, registry cardinality,
-and exporter scheduling. It deliberately does not own network protocols,
-persistent storage, error logging, service discovery, or backend-specific
-schemas.
+MTF владеет телеметрическими данными в процессе, агрегированием метрик, кардинальностью
+registry и exporter планирование. Он намеренно не владеет сетевыми протоколами,
+постоянным хранилищем, ошибкой логгирование, обнаружением сервисов или специфическими
+для backend схемами.
 
 ## Принципы работы
 
-Инструментирование отделено от экспорта. Instruments изменяют собственное
-агрегированное состояние, snapshots превращают его в наблюдения, а events и
-spans сразу создают владеющий `Record`. Поэтому exporter может сохранить запись
-после возврата producer-вызова.
+Инструментирование и экспорт намеренно разделены. Инструменты обновляют собственное
+агрегированное состояние; snapshots превращают его в наблюдения. События и spans сразу
+создают владеющие `Record`, поэтому exporters могут сохранять записи после возврата
+producer-вызова.
 
 ```text
-обновление instrument -> атомарное/защищённое состояние -> snapshot -> Record
-event/span ------------------------------------------------------^
-Record -> direct pipeline -> exporter в producer-потоке
-Record -> async pipeline  -> ограниченная очередь -> worker -> exporter
+instrument update -> atomic/mutex-protected state -> snapshot -> Record
+event/span -----------------------------------------------^
+Record -> direct pipeline -> exporter on producer thread
+Record -> async pipeline  -> bounded queue -> worker -> exporter
 ```
 
-Direct pipeline передаёт producer задержку exporter. Async pipeline переносит
-принятые записи в очередь фиксированной ёмкости, применяет backpressure,
-экспортирует ограниченные batch, после начала shutdown отклоняет публикации и
-перед join выгружает уже принятые записи. Callback exporter выполняется без
-блокировки очереди, а pipeline разделяет владение exporter.
+Прямой pipeline позволяет производителю видеть задержку exporter. Асинхронный pipeline
+перемещает принятые записи в очередь с фиксированной вместимостью, применяет
+backpressure при достижении ёмкости, экспортирует ограниченные пакеты, отклоняет
+публикацию после начала shutdown и выгружает уже принятые записи перед присоединением
+worker. Callback exporter выполняется без блокировки очереди, а pipeline разделяет
+владение exporter.
 
-Синхронизация соответствует инварианту данных: counter и gauge используют
-relaxed atomics, histogram — один mutex для согласованных buckets, count и sum.
-Лимиты registry и очереди ограничивают память. Протоколы backend, retry,
-persistence и глобальные registry остаются явным выбором приложения.
+Синхронизация метрик соответствует требуемому инварианту: счётчики и показатели
+используют ослабленные атомарные операции для независимых значений, в то время как
+гистограммы snapshots используют один mutex для внутренне согласованных корзин,
+количества и суммы. Registry и ограничения очереди ограничивают рост памяти. Протоколы
+бэкенда, повторные попытки, persistence и глобальные реестры остаются явными решениями
+по композиции на уровне приложения.
 
-## Dependency direction
+## Направление зависимости
 
 ```text
 MicroContractsFramework (concepts only)
@@ -44,49 +47,48 @@ MicroTelemetryFramework (runtime implementation)
  application + chosen exporters
 ```
 
-MTF depends only on MCF and the C++23 standard library. Exporters may compose
-MEF, MPF, OpenTelemetry, Prometheus, a file writer, or application code at the
-composition root. Those integrations must not become dependencies of MTF core.
+MTF зависит только от MCF и стандартной библиотеки C++23. Экспортеры могут использовать
+MEF, MPF, OpenTelemetry, Prometheus, файловый писатель или код приложения в корне
+композиции. Эти интеграции не должны становиться зависимостями ядра MTF.
 
-## Components
+## Компоненты
 
-### Records
+### Записи
 
-`Record` is an owning envelope containing a name, wall-clock timestamp,
-attributes, and a `MetricData`, `EventData`, or `SpanData` payload. Exporters can
-retain a record after a callback returns. `Span` measures duration with a
-monotonic clock while preserving a wall-clock start timestamp.
+`Record` — это владеющий конверт, содержащий имя, метку времени по стеновому часу, атрибуты и полезную нагрузку `MetricData`, `EventData` или `SpanData`. Экспортеры могут сохранять запись после возврата обратного вызова. `Span` измеряет продолжительность с
+помощью монотонного часов, сохраняя при этом стартовую метку времени по стеновому часу.
 
-### Instruments and registry
+### Инструменты и registry
 
-`Counter` and `Gauge` use relaxed atomics because they provide independent
-numeric observations rather than ordering application memory. `Histogram`
-protects buckets, count, and sum with one mutex so each snapshot is internally
-consistent.
+`Counter` и `Gauge` используют расслабленные атомарные операции, потому что они
+предоставляют независимые числовые наблюдения, а не упорядочивают память приложения.
+`Histogram` защищает корзины, количество и сумму с помощью одного mutex, так что каждый
+snapshot внутренне согласован.
 
-`Registry` owns instrument states. Returned handles share those states and
-remain valid after registry removal. Names are unique across instrument kinds.
-The default cardinality limit is 4096 and the hard supported limit is 1,000,000.
+`Registry` владеет состояниями инструмента. Возвращенные дескрипторы разделяют эти
+состояния и остаются действительными после удаления registry. Имена уникальны для
+каждого вида инструмента. Ограничение по умолчанию на количество — 4096, а жестко
+поддерживаемый предел — 1,000,000.
 
-### Export pipelines
+### Экспорт pipelines
 
-The direct pipeline calls its exporter on the producer thread. The asynchronous
-pipeline owns a fixed-capacity queue and one worker. Producers block at
-capacity, the worker exports bounded batches, and shutdown rejects new records
-before draining accepted records. Export callbacks execute without holding the
-queue mutex.
+Прямой pipeline вызывает свой exporter в потоке производителя. Асинхронный pipeline
+владеет очередью фиксированной ёмкости и одним worker. Производители блокируются при
+достижении ёмкости, worker экспортирует ограниченные партии, а shutdown отвергает новые
+записи до опорожнения принятых записей. Обратные вызовы экспорта выполняются без
+удерживания mutex очереди.
 
-The pipeline shares ownership of its exporter. This prevents an exporter from
-being destroyed while an asynchronous callback is in flight.
+pipeline делится владение своей exporter. Это предотвращает уничтожение exporter, пока
+выполняется асинхронный обратный вызов.
 
-## Non-goals for 0.1
+## Не-цели для 0.1
 
-- backend-specific wire formats;
-- distributed trace context propagation;
-- periodic collection scheduler;
-- dynamic histogram boundaries;
-- process-global registries;
-- implicit retries or unbounded queues.
+- Специфические форматы проводов backend;
+- распределённая передача контекста трассировки
+- планировщик периодического сбора
+- динамические границы гистограммы;
+- process-global реестры;
+- неявные повторы или неограниченные очереди.
 
-These features can be added at explicit extension seams without changing the
-instrument storage model.
+Эти функции могут быть добавлены в явные точки расширения без изменения модели хранения
+инструмента.

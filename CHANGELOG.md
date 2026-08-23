@@ -1,18 +1,19 @@
-# Changelog
+# Журнал изменений
 
 ## 0.1.1-beta - 2026-08-22
 
-- Added pinned counter and histogram comparisons with prometheus-cpp 1.3.0
-  and OpenTelemetry C++ 1.9.1.
-- Added a validated MCF + MEF + MPF + MTF end-to-end benchmark.
-- Documented benchmark equivalence limits and ecosystem maturity.
+- Добавлены закрепленный счетчик и сравнения гистограмм с prometheus-cpp 1.3.0 и
+  OpenTelemetry C++ 1.9.1.
+- Добавлен проверенный сквозной эталон MCF + MEF + MPF + MTF.
+- Задокументированные пределы эквивалентности эталонов и зрелость экосистемы.
 
 ## 0.1.0-beta - 2026-08-22
 
-- Added owning metrics, events, spans, and attributes.
-- Added atomic counters/gauges and fixed-boundary histograms.
-- Added a bounded thread-safe instrument registry.
-- Added direct and bounded asynchronous exporter pipelines.
-- Added batching, blocking backpressure, flush, drain shutdown, and statistics.
-- Added MCF telemetry contract validation, CMake packaging, tests, benchmarks,
-  examples, sanitizers, static analysis, and cross-platform CI.
+- Добавлены метрики владения, события, spans и атрибуты.
+- Добавлены атомарные счетчики/измерители и гистограммы с фиксированными границами.
+- Добавлен ограниченный инструмент thread-safe registry.
+- Добавлены прямой и ограниченный асинхронный exporter pipelines.
+- Добавлена пакетная обработка, блокировка backpressure, flush, опорожнение shutdown и
+  статистика.
+- Добавлены проверка телеметрического контракта MCF, упаковка CMake, тесты, бенчмарки,
+  примеры, санитайзеры, статический анализ и кроссплатформенная CI.
