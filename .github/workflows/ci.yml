@@ -240,3 +240,19 @@ jobs:
             -DCMAKE_PREFIX_PATH="$PWD/stage"
           cmake --build consumer --parallel 2
           ./consumer/mtf_package_consumer
+
+  translation-parity:
+    if: github.ref == 'refs/heads/main-ru'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify main-ru is documentation-only
+        shell: bash
+        run: |
+          git fetch origin main
+          git diff --exit-code origin/main HEAD -- . ':(exclude,glob)**/*.md'
+          git ls-tree -r --name-only origin/main | grep -E '\.md$' | sort > main-md.txt
+          git ls-tree -r --name-only HEAD | grep -E '\.md$' | sort > ru-md.txt
+          diff -u main-md.txt ru-md.txt
