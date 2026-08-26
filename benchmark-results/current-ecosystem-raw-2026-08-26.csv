@@ -1,0 +1,15 @@
+sample,scenario,transactions,throughput_per_second,persisted_records
+1,ecosystem_direct,100000,4.53387e+06,200000
+1,ecosystem_async,100000,1.43066e+06,200000
+2,ecosystem_direct,100000,4.5179e+06,200000
+2,ecosystem_async,100000,1.68919e+06,200000
+3,ecosystem_direct,100000,4.7666e+06,200000
+3,ecosystem_async,100000,1.65822e+06,200000
+4,ecosystem_direct,100000,4.87843e+06,200000
+4,ecosystem_async,100000,2.05767e+06,200000
+5,ecosystem_direct,100000,4.78263e+06,200000
+5,ecosystem_async,100000,2.19133e+06,200000
+6,ecosystem_direct,100000,4.63747e+06,200000
+6,ecosystem_async,100000,1.8831e+06,200000
+7,ecosystem_direct,100000,4.67856e+06,200000
+7,ecosystem_async,100000,1.84148e+06,200000

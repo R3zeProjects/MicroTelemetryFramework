@@ -14,7 +14,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  MCF_REF: b9f78d3f529097ac1dae963b06274a6110b39c1a
+  MCF_REF: 39996b3b2f2f20860e8e396c12165c096b924999
 
 jobs:
   external-comparisons:

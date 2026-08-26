@@ -53,7 +53,7 @@ direct.publish(records);
 using Async = vosp::telemetry::pipeline_policy::Async<1024, 64>;
 vsp::TelemetryPipeline<Async> async{exporter};
 async.publish(records);
-async.flush();
+const bool drained = async.flush();
 async.shutdown();
 const auto stats = async.stats();
 ```

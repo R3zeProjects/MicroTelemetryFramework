@@ -1,6 +1,7 @@
 build/
 /b/
 build-*/
+audit-*/
 cmake-build-*/
 install-*/
 CMakeFiles/

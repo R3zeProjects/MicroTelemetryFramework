@@ -19,6 +19,7 @@ option(MTF_ENABLE_SANITIZERS "Enable AddressSanitizer and UndefinedBehaviorSanit
 option(MTF_ENABLE_THREAD_SANITIZER "Enable ThreadSanitizer" OFF)
 option(MTF_FETCH_CONTRACTS "Fetch pinned MCF contracts when not installed" ON)
 set(MTF_CONTRACTS_SOURCE_DIR "" CACHE PATH "Optional MicroContractsFramework source tree")
+set(MCF_BUILD_EXAMPLES OFF CACHE BOOL "Build embedded MCF examples" FORCE)
 
 if(MTF_ENABLE_SANITIZERS AND MTF_ENABLE_THREAD_SANITIZER)
     message(FATAL_ERROR "ASan/UBSan and ThreadSanitizer require separate builds")
@@ -46,7 +47,7 @@ if(NOT TARGET vosp::contracts)
             include(FetchContent)
             FetchContent_Declare(vosp_contracts
                 GIT_REPOSITORY https://github.com/R3zeProjects/MicroContractsFramework.git
-                GIT_TAG e69892633f0d863424a5b76c9730c2456691e564
+                GIT_TAG 39996b3b2f2f20860e8e396c12165c096b924999
                 GIT_SHALLOW FALSE)
             set(_mtf_saved_build_testing "${BUILD_TESTING}")
             set(BUILD_TESTING OFF)
@@ -68,8 +69,8 @@ target_link_libraries(MicroTelemetryFramework INTERFACE
     vosp::contracts Threads::Threads)
 
 target_compile_options(MicroTelemetryFramework INTERFACE
-    $<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/W4;/permissive->
-    $<$<COMPILE_LANG_AND_ID:CXX,GNU,Clang,AppleClang>:-Wall;-Wextra;-Wpedantic>
+    $<BUILD_INTERFACE:$<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/W4;/permissive->>
+    $<BUILD_INTERFACE:$<$<COMPILE_LANG_AND_ID:CXX,GNU,Clang,AppleClang>:-Wall;-Wextra;-Wpedantic>>
 )
 
 function(mtf_enable_sanitizers target)
@@ -135,6 +136,7 @@ if(MTF_BUILD_EXTERNAL_COMPARISON_BENCHMARKS)
     FetchContent_Declare(mtf_prometheus_cpp
         GIT_REPOSITORY https://github.com/jupp0r/prometheus-cpp.git
         GIT_TAG e5fada43131d251e9c4786b04263ce98b6767ba5
+        GIT_SUBMODULES ""
         GIT_SHALLOW FALSE)
     FetchContent_MakeAvailable(mtf_prometheus_cpp)
 
@@ -145,11 +147,13 @@ if(MTF_BUILD_EXTERNAL_COMPARISON_BENCHMARKS)
     set(WITH_OTLP_HTTP OFF CACHE BOOL "" FORCE)
     set(WITH_ZIPKIN OFF CACHE BOOL "" FORCE)
     set(WITH_PROMETHEUS OFF CACHE BOOL "" FORCE)
+    set(WITH_ETW OFF CACHE BOOL "" FORCE)
     set(WITH_BENCHMARK OFF CACHE BOOL "" FORCE)
     set(OPENTELEMETRY_INSTALL OFF CACHE BOOL "" FORCE)
     FetchContent_Declare(mtf_opentelemetry_cpp
         GIT_REPOSITORY https://github.com/open-telemetry/opentelemetry-cpp.git
         GIT_TAG 770fce3c4095f6dc852fd80fb0810936b723be9a
+        GIT_SUBMODULES ""
         GIT_SHALLOW FALSE)
     FetchContent_MakeAvailable(mtf_opentelemetry_cpp)
 
@@ -167,11 +171,11 @@ if(MTF_BUILD_ECOSYSTEM_BENCHMARKS)
     endif()
     FetchContent_Declare(mtf_mef
         GIT_REPOSITORY https://github.com/R3zeProjects/MicroErrorFramework.git
-        GIT_TAG 8c718fc49c65c82d7451434194b024b8e0197dec
+        GIT_TAG 7692a00b333dfc7549893ec5bb0e91b8db655307
         GIT_SHALLOW FALSE)
     FetchContent_Declare(mtf_mpf
         GIT_REPOSITORY https://github.com/R3zeProjects/MicroPersistenceFramework.git
-        GIT_TAG fd6836abb96dacfbcfb4cb363edaf264b1442d64
+        GIT_TAG ab76da8993120331ca7b87755f319550fd5c8267
         GIT_SHALLOW FALSE)
     FetchContent_GetProperties(mtf_mef)
     if(NOT mtf_mef_POPULATED)
@@ -186,12 +190,17 @@ if(MTF_BUILD_ECOSYSTEM_BENCHMARKS)
     endif()
 
     set(MEF_CONTRACTS_SOURCE_DIR "${MTF_CONTRACTS_SOURCE_DIR}" CACHE PATH "" FORCE)
+    set(MEF_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+    set(BUILD_BENCHMARKS OFF CACHE BOOL "" FORCE)
+    set(BUILD_EXTERNAL_COMPARISON_BENCHMARKS OFF CACHE BOOL "" FORCE)
     set(MPF_MEF_SOURCE_DIR "${mtf_mef_SOURCE_DIR}" CACHE PATH "" FORCE)
     set(MPF_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
     set(MPF_BUILD_BENCHMARKS OFF CACHE BOOL "" FORCE)
     set(MPF_BUILD_EXTERNAL_COMPARISON_BENCHMARKS OFF CACHE BOOL "" FORCE)
     set(_mtf_saved_build_testing "${BUILD_TESTING}")
     set(BUILD_TESTING OFF)
+    add_subdirectory("${mtf_mef_SOURCE_DIR}"
+                     "${CMAKE_CURRENT_BINARY_DIR}/ecosystem/mef" EXCLUDE_FROM_ALL)
     add_subdirectory("${mtf_mpf_SOURCE_DIR}"
                      "${CMAKE_CURRENT_BINARY_DIR}/ecosystem/mpf" EXCLUDE_FROM_ALL)
     set(BUILD_TESTING "${_mtf_saved_build_testing}")

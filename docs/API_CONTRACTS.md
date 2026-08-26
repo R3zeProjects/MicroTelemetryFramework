@@ -45,7 +45,10 @@ Invalid instrument definitions throw `std::invalid_argument` or
 
 Async `flush()` returns `false` when invoked recursively from its own exporter
 worker because waiting for that callback would deadlock. `shutdown()` is
-idempotent, rejects new work, and drains already accepted records. Destruction
+idempotent, rejects new work, and drains already accepted records. When an
+exporter callback initiates shutdown, the worker cannot join itself; it releases
+the thread handle and finishes draining through shared internal state. An
+external `flush()` may be used to wait for that completion. Destruction
 concurrent with calls through the same pipeline object remains unsupported;
 the owner must end producer access before destroying it.
 

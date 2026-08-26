@@ -76,7 +76,9 @@ The direct pipeline calls its exporter on the producer thread. The asynchronous
 pipeline owns a fixed-capacity queue and one worker. Producers block at
 capacity, the worker exports bounded batches, and shutdown rejects new records
 before draining accepted records. Export callbacks execute without holding the
-queue mutex.
+queue mutex. A shutdown requested by the exporter worker releases its own thread
+handle instead of self-joining; the worker retains shared state until the drain
+finishes.
 
 The pipeline shares ownership of its exporter. This prevents an exporter from
 being destroyed while an asynchronous callback is in flight.

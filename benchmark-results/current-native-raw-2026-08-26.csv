@@ -1,0 +1,22 @@
+sample,scenario,throughput_per_second
+1,counter,1.21585e+08
+1,async,2.22619e+06
+1,async batch,1.82219e+07
+2,counter,1.22493e+08
+2,async,1.86894e+06
+2,async batch,1.35614e+07
+3,counter,1.10312e+08
+3,async,1.98142e+06
+3,async batch,2.0245e+07
+4,counter,9.69556e+07
+4,async,1.98249e+06
+4,async batch,1.32064e+07
+5,counter,1.16681e+08
+5,async,2.24829e+06
+5,async batch,1.77252e+07
+6,counter,1.13116e+08
+6,async,2.01729e+06
+6,async batch,1.84962e+07
+7,counter,1.23315e+08
+7,async,1.98708e+06
+7,async batch,1.84945e+07

@@ -1,4 +1,5 @@
-#include <vosp.hpp>
+#include <vosp/error.hpp>
+#include <vosp/logger.hpp>
 #include <vosp/persistence.hpp>
 #include <vosp/telemetry.hpp>
 
@@ -24,7 +25,7 @@ public:
         records_.reserve(capacity);
     }
 
-    [[nodiscard]] vosp::error::OperationResult append(
+    [[nodiscard]] vosp::persistence::OperationResult append(
         const vosp::persistence::Record& record)
     {
         std::scoped_lock lock{mutex_};
@@ -60,8 +61,8 @@ public:
                     .timestamp_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
                         record.timestamp().time_since_epoch()).count(),
                     .thread_token = 0,
-                    .level = vosp::logger::Level::INFO,
-                    .category = vosp::error::Category::NONE,
+                    .level = static_cast<std::uint32_t>(vosp::logger::Level::INFO),
+                    .category = static_cast<std::uint32_t>(vosp::error::Category::NONE),
                     .code = 0,
                     .message = std::string{record.name()}}))
             {
@@ -85,7 +86,7 @@ template<typename Pipeline>
     Pipeline& telemetry,
     MemoryJournal& journal)
 {
-    vosp::persistence::MefSink persistence_sink{journal};
+    vosp::persistence::Sink persistence_sink{journal};
     vosp::logger::Logger logger{persistence_sink};
     vosp::telemetry::Registry metrics;
     auto requests = metrics.counter("ecosystem.requests");
