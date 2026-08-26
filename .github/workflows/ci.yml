@@ -237,7 +237,8 @@ jobs:
       - name: Build and run consumer
         run: |
           cmake -S mtf/tests/package_consumer -B consumer -G Ninja \
-            -DCMAKE_PREFIX_PATH="$PWD/stage"
+            -DCMAKE_PREFIX_PATH="$PWD/stage" \
+            -DCMAKE_CXX_COMPILER=clang++
           cmake --build consumer --parallel 2
           ./consumer/mtf_package_consumer
 

@@ -74,13 +74,16 @@ using namespace vosp::telemetry;
 {
     Registry registry;
     static_cast<void>(registry.counter("same"));
+    const std::string_view same = "same";
     try
     {
         static_cast<void>(registry.gauge("same"));
     }
     catch (const std::logic_error &)
     {
-        return true;
+        return check(registry.remove(same), "heterogeneous registry removal") &&
+               check(!registry.remove(same), "missing registry removal") &&
+               check(registry.size() == 0, "registry is empty after removal");
     }
     return false;
 }

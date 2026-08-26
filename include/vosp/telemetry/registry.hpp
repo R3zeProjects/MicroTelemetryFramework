@@ -4,6 +4,7 @@
 
 #include <vosp/telemetry/instruments.hpp>
 
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <ranges>
@@ -16,6 +17,19 @@
 
 namespace vosp::telemetry
 {
+namespace detail
+{
+struct TransparentStringHash
+{
+    using is_transparent = void;
+
+    [[nodiscard]] std::size_t operator()(std::string_view value) const noexcept
+    {
+        return std::hash<std::string_view>{}(value);
+    }
+};
+} // namespace detail
+
 /** @brief Thread-safe owner and factory for uniquely named instruments. */
 class Registry
 {
@@ -100,7 +114,13 @@ public:
     [[nodiscard]] bool remove(std::string_view name)
     {
         std::scoped_lock lock{mutex_};
-        return instruments_.erase(std::string{name}) != 0;
+        const auto instrument = instruments_.find(name);
+        if (instrument == instruments_.end())
+        {
+            return false;
+        }
+        instruments_.erase(instrument);
+        return true;
     }
 
     [[nodiscard]] std::size_t size() const
@@ -157,7 +177,9 @@ private:
     }
 
     mutable std::mutex mutex_;
-    std::unordered_map<std::string, std::shared_ptr<detail::InstrumentState>> instruments_;
+    std::unordered_map<std::string, std::shared_ptr<detail::InstrumentState>,
+                       detail::TransparentStringHash, std::equal_to<>>
+        instruments_;
     std::size_t capacity_;
 };
 } // namespace vosp::telemetry

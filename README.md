@@ -161,4 +161,15 @@ valuable when the real exporter blocks or has bursty latency.
 - [Benchmark methodology](docs/BENCHMARKS.md)
 - [Ecosystem capability and maturity assessment](docs/ECOSYSTEM.md)
 
+## Ecosystem role and language branches
+
+MTF owns metrics, events, spans, bounded registries, and direct or asynchronous
+export pipelines. Exporters remain application-selected, allowing MPF or another
+storage/transport module to be substituted without changing instrumentation. The
+[ecosystem compatibility gate](https://github.com/R3zeProjects/MicroContractsFramework/blob/main/docs/ECOSYSTEM_COMPATIBILITY.md)
+verifies direct export, bounded async drain, shutdown rejection, and persistence.
+
+`main` is the canonical English branch. `main-ru` preserves identical source and
+translates Markdown documentation into Russian; Actions enforces the boundary.
+
 MTF is licensed under the MIT License.

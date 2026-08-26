@@ -46,7 +46,7 @@ if(NOT TARGET vosp::contracts)
             include(FetchContent)
             FetchContent_Declare(vosp_contracts
                 GIT_REPOSITORY https://github.com/R3zeProjects/MicroContractsFramework.git
-                GIT_TAG b9f78d3f529097ac1dae963b06274a6110b39c1a
+                GIT_TAG e69892633f0d863424a5b76c9730c2456691e564
                 GIT_SHALLOW FALSE)
             set(_mtf_saved_build_testing "${BUILD_TESTING}")
             set(BUILD_TESTING OFF)
@@ -67,11 +67,10 @@ target_include_directories(MicroTelemetryFramework INTERFACE
 target_link_libraries(MicroTelemetryFramework INTERFACE
     vosp::contracts Threads::Threads)
 
-if(MSVC)
-    target_compile_options(MicroTelemetryFramework INTERFACE /W4 /permissive-)
-else()
-    target_compile_options(MicroTelemetryFramework INTERFACE -Wall -Wextra -Wpedantic)
-endif()
+target_compile_options(MicroTelemetryFramework INTERFACE
+    $<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/W4;/permissive->
+    $<$<COMPILE_LANG_AND_ID:CXX,GNU,Clang,AppleClang>:-Wall;-Wextra;-Wpedantic>
+)
 
 function(mtf_enable_sanitizers target)
     if(MTF_ENABLE_SANITIZERS)
@@ -168,11 +167,11 @@ if(MTF_BUILD_ECOSYSTEM_BENCHMARKS)
     endif()
     FetchContent_Declare(mtf_mef
         GIT_REPOSITORY https://github.com/R3zeProjects/MicroErrorFramework.git
-        GIT_TAG c11c3aa25814baa1a889ab1f80b718e59e3a24a9
+        GIT_TAG 8c718fc49c65c82d7451434194b024b8e0197dec
         GIT_SHALLOW FALSE)
     FetchContent_Declare(mtf_mpf
         GIT_REPOSITORY https://github.com/R3zeProjects/MicroPersistenceFramework.git
-        GIT_TAG 00aec475b283812c232758c539e70ce8fae09f64
+        GIT_TAG fd6836abb96dacfbcfb4cb363edaf264b1442d64
         GIT_SHALLOW FALSE)
     FetchContent_GetProperties(mtf_mef)
     if(NOT mtf_mef_POPULATED)

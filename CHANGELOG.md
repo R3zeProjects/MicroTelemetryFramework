@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Updated MCF, MEF, and MPF integration pins to the validated ecosystem baseline.
+- Removed the temporary `std::string` allocation when registry entries are erased
+  through a `std::string_view`.
+
 ## 0.1.1-beta - 2026-08-22
 
 - Added pinned counter and histogram comparisons with prometheus-cpp 1.3.0
